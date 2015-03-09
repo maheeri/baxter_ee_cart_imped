@@ -510,7 +510,7 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
 
 void EECartImpedControlClassTool::starting() {
 
-  // Forward kinematics code for 
+  // Forward kinematics code for PR2 -> Modified version for Baxter is below
   /*/ Get the current joint values to compute the initial tip location.
   KDL::Frame init_pos;
   KDL::JntArray q0(kdl_chain_.getNrOfJoints());
@@ -519,6 +519,20 @@ void EECartImpedControlClassTool::starting() {
   //in the current implementation
   read_only_chain_.getPositions(q0);
   fksolver.JntToCart(q0, init_pos);*/
+  
+  // Forward kinematics code for Baxter
+  // Get the current joint values to compute the initial tip location.
+  KDL::Frame init_pos;
+  int numJoints = baxter_chain.getNrOfJoints();
+  KDL::JntArray q0(numJoints);
+  KDL::ChainFkSolverPos_recursive fksolver(baxter_chain);
+  //this operation is not listed as const but is in fact
+  //in the current implementation
+  for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
+  	q0(i) = baxter_joint_state.position[i];
+  }
+  fksolver.JntToCart(q0, init_pos);
+  
 
   ROS_INFO("EE: STARTING CALLED");
 
