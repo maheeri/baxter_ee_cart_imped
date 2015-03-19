@@ -352,6 +352,7 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
     }
     n.param("use_fixed_frame",use_fixed_frame_,false);
 
+	/* THE CODE IN THIS COMMENT IS PR2 SPECIFIC AND IS NOT NEEDED FOR BAXTER 
     // get a handle to the hardware interface 
     pr2_hardware_interface::HardwareInterface* hardwareInterface = robot->model_->hw_;
     if(!hardwareInterface)
@@ -420,7 +421,8 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
     #endif
 
     ROS_INFO("I'M HERE AND PISSED ABOUT IT");
-
+    */
+    
     // Construct a chain from the root to the tip and prepare the kinematics
     // Note the joints must be calibrated
     if (!chain_.init(robot, root_name, tip_name))
@@ -536,9 +538,11 @@ void EECartImpedControlClassTool::starting() {
 
   ROS_INFO("EE: STARTING CALLED");
 
-
+  // NEED TO CHANGE HOW WE GET THE LAST TIME (USING ROS::TIME::NOW FOR NOW) 
+  // NEED TO UPDATE TIME ACCORDING TO THE LAST LOOP ITERATION FOR UPDATE
   // Also reset the time-of-last-servo-cycle
-  last_time_ = robot_state_->getTime();
+  last_time_ = ros::Time::now();
+  // last_time_ = robot_state_->getTime();
   ///Hold current position trajectory
   boost::shared_ptr<EECartImpedData> hold_traj_ptr(new EECartImpedData());
   if (!hold_traj_ptr) {
@@ -594,13 +598,27 @@ void EECartImpedControlClassTool::starting() {
 
 void EECartImpedControlClassTool::update()
 {
+	// NEED TO UPDATE TIME ACCORDING TO THE LAST LOOP ITERATION FOR UPDATE
     last_time_ = robot_state_->getTime();
+    int numJoints = baxter_chain.getNrOfJoints();
 
     // Get the current joint positions and velocities
-    chain_.getPositions(q_);
+    // Using baxter_joint_state rather than chain_ for porting to assign poses, velocities and efforts
+    for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
+    	q_(i) = baxter_joint_state.position[i];
+  	}
+    
+    for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
+  		qdot_(i) = baxter_joint_state.velocity[i];
+  	}
+    
+    for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
+  		tau_act_(i) = baxter_joint_state.effort[i];
+  	}
+    /*chain_.getPositions(q_);
     chain_.getVelocities(qdot_);
 
-    chain_.getEfforts(tau_act_);
+    chain_.getEfforts(tau_act_);*/
 
     // Compute the forward kinematics and Jacobian (at this location)
     jnt_to_pose_solver_->JntToCart(q_, x_);
