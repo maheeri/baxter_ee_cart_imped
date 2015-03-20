@@ -30,25 +30,18 @@ void EECartImpedControlClassTool::talk(std::string str)
   }
 }
 
+
 double EECartImpedControlClassTool::linearlyInterpolate(double time, 
 						    double startTime, 
 						    double endTime, 
 						    double startValue, 
 						    double endValue) {
-  //std::stringstream ss;
-
-  /*double retVal = startValue + 
-    (time - startTime)*
-    (endValue - startValue)/(endTime - startTime);*/
-
-  //ss << boost::format("%.6f %.6f %.6f %.6f %.6f %.6f") % time % startTime % endTime % startValue % endValue % retVal;
-
-  //talk("linearlyInterpolate() called");
 
   return startValue + 
     (time - startTime)*
     (endValue - startValue)/(endTime - startTime);
 }
+
 
 ee_cart_imped_msgs::StiffPoint 
 EECartImpedControlClassTool::sampleInterpolation() {
@@ -91,7 +84,6 @@ EECartImpedControlClassTool::sampleInterpolation() {
     }
   }
 
-      // If the tool frame is set to be relative to the hand, then we need
     // to update it every time we change the hand frame. 
     // If not, we already set it up when we got the trajectory, and don't need
     // to update it here
@@ -105,12 +97,6 @@ EECartImpedControlClassTool::sampleInterpolation() {
         {
             tool_frame_ = KDL::Frame(KDL::Rotation::Quaternion(initial_point.pose.orientation.x,initial_point.pose.orientation.y,initial_point.pose.orientation.z,initial_point.pose.orientation.w)*hand_to_tool_);
         }
-          /*double hX, hY, hZ, hW;
-  tool_frame_.M.GetQuaternion(hX,hY,hZ,hW);
-
-   std::stringstream ss;
-        ss << boost::format("Updated TF %.3f %.3f %.3f %.3f") % hX % hY % hZ % hW;
-        talk(ss.str());*/
     }
 
   if (current_goal_index >= (signed int)desiredPoses.size()) {
@@ -153,10 +139,6 @@ EECartImpedControlClassTool::sampleInterpolation() {
     last_point_.isTorqueZ = desiredPoses[current_goal_index-1].isTorqueZ;
     last_point_.time_from_start = 
       desiredPoses[current_goal_index-1].time_from_start;
-
-    /*std::stringstream ss;
-    ss << boost::format("Updated frame, Z: %+.3f %+.3f %+.3f") % tool_frame_(0,2) % tool_frame_(1,2) % tool_frame_(2,2);
-    talk(ss.str());*/
   }
 
   ee_cart_imped_msgs::StiffPoint start_point;
@@ -194,13 +176,6 @@ EECartImpedControlClassTool::sampleInterpolation() {
     next_point.pose.position.x = linearlyInterpolate
       (timeFromStart, segStartTime, segEndTime, 
        start_point.pose.position.x, end_point.pose.position.x);
-
-    /*if (updates_ % 11 == 0)
-    {
-        std::stringstream ss;
-        ss << boost::format("%.6f %.6f %.6f %.6f %.6f %.6f") % timeFromStart % segStartTime % segEndTime % start_point.pose.position.x % end_point.pose.position.x % next_point.pose.position.x;
-        talk(ss.str());
-    }*/
 
     next_point.pose.position.y = linearlyInterpolate
       (timeFromStart, segStartTime, segEndTime, 
@@ -255,11 +230,6 @@ void EECartImpedControlClassTool::toolPoseCB
 				      msg.orientation.w);
 
         std::stringstream ss;
-       /* ss << boost::format("%.3f %.3f %.3f %.3f") % msg.orientation.x % 
-				      msg.orientation.y %  
-				      msg.orientation.z %  
-				      msg.orientation.w;
-        talk(ss.str());*/
 }
   
 
@@ -280,11 +250,28 @@ void EECartImpedControlClassTool::commandCB
   }
     
   EECartImpedData &new_traj = *new_traj_ptr;
+  
+  // Forward kinematics code for PR2 -> Modified version for Baxter is below
+  /*/ Get the current joint values to compute the initial tip location.
   KDL::Frame init_pos;
   KDL::JntArray q0(kdl_chain_.getNrOfJoints());
   KDL::ChainFkSolverPos_recursive fksolver(kdl_chain_);
-  //Operation is in fact const (although not listed as such)
-  read_only_chain_.getPositions(q0);    
+  //this operation is not listed as const but is in fact
+  //in the current implementation
+  read_only_chain_.getPositions(q0);
+  fksolver.JntToCart(q0, init_pos);*/
+  
+  // DO WE EVEN NEED THIS? INIT_POS IS NOT EVEN USED 
+  // Forward kinematics code for Baxter
+  KDL::Frame init_pos;
+  int numJoints = baxter_chain.getNrOfJoints();
+  KDL::JntArray q0(numJoints);
+  KDL::ChainFkSolverPos_recursive fksolver(baxter_chain);
+  //this operation is not listed as const but is in fact
+  //in the current implementation
+  for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
+  	q0(i) = baxter_joint_state.position[i];
+  }
   fksolver.JntToCart(q0, init_pos);
 
   new_traj.initial_point.pose.position.x = xd_.p(0);
@@ -318,8 +305,6 @@ void EECartImpedControlClassTool::commandCB
   node_.param("kd_p_y",Kd_.vel(1),0.0);
   node_.param("kd_p_z",Kd_.vel(2),0.0);
 
-  //talk("JUST UPDATED KD");
-
   // If we're using a fixed frame, set it. If relative, it'll be set when
   // we sample from the trajectory so don't need to worry about it here
   if(use_fixed_frame_)
@@ -327,7 +312,11 @@ void EECartImpedControlClassTool::commandCB
     tool_frame_ = KDL::Frame(hand_to_tool_);
   }
   
-  chain_.getEfforts(tau_prev_);
+  // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
+  // chain_.getEfforts(tau_prev_);
+  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  		tau_prev_(i) = baxter_joint_state.velocity[i];
+  }
 }
 
 bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
@@ -351,77 +340,6 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
         return false;
     }
     n.param("use_fixed_frame",use_fixed_frame_,false);
-
-	/* THE CODE IN THIS COMMENT IS PR2 SPECIFIC AND IS NOT NEEDED FOR BAXTER 
-    // get a handle to the hardware interface 
-    pr2_hardware_interface::HardwareInterface* hardwareInterface = robot->model_->hw_;
-    if(!hardwareInterface)
-    {
-        ROS_ERROR("Perhaps Something wrong with the hardware interface pointer!!!!");
-    }
-
-    ROS_INFO("After normal stuff");
-
-    #ifndef PRESS_DBG
-    // get a handle to our accelerometer 
-    std::string accelerometer_name;
-    if(!n.getParam("accelerometer_name", accelerometer_name))
-    {
-        ROS_ERROR("No accelerometer given in namespace: '%s')", n.getNamespace().c_str());
-        return false;
-    }
-    pr2_hardware_interface::Accelerometer* accelerometerHandle = hardwareInterface->getAccelerometer(accelerometer_name);
-  
-    if(!accelerometerHandle)
-    {
-        ROS_ERROR("PR2GripperSensorController could not find accel named '%s'", accelerometer_name.c_str());
-        return false;
-    }
-    myAccelerationObserver = new accelerationObserver(accelerometerHandle);
-
-    // get a handle to our left finger pressure sensors 
-    std::string leftFinger_pressureSensor_name;
-    if(!n.getParam("left_pressure_sensor_name", leftFinger_pressureSensor_name))
-    {
-        ROS_ERROR("No accelerometer given in namespace: '%s')",	n.getNamespace().c_str());
-        return false;
-    }
-
-    ROS_INFO("EE: CHKPT 1");
-
-    pr2_hardware_interface::PressureSensor* leftFinger_pressureSensorHandle = hardwareInterface->getPressureSensor(leftFinger_pressureSensor_name);
-    if(!leftFinger_pressureSensorHandle)
-    {
-        ROS_ERROR("PR2GripperSensorController could not find sensor named '%s'", leftFinger_pressureSensor_name.c_str());
-        return false;
-    }
-    //ROS_INFO("EE: CHKPT 2");
-    ROS_INFO("EE: L name: %s",leftFinger_pressureSensor_name.c_str());
-    //ROS_INFO("EE: L name: %s R name: %s",leftFinger_pressureSensor_name,rightFinger_pressureSensor_name);
-
-    // get a handle to our right finger pressure sensors 
-    std::string rightFinger_pressureSensor_name;  
-    if(!n.getParam("right_pressure_sensor_name", rightFinger_pressureSensor_name))
-    {
-        ROS_ERROR("No accelerometer given in namespace: '%s')",   n.getNamespace().c_str());
-        return false;
-    }
-    ROS_INFO("EE: L name: %s R name: %s",leftFinger_pressureSensor_name.c_str(),rightFinger_pressureSensor_name.c_str());
-    ROS_INFO("EE: Chkpt 3");
-    pr2_hardware_interface::PressureSensor* rightFinger_pressureSensorHandle = hardwareInterface->getPressureSensor(rightFinger_pressureSensor_name);
-    if(!rightFinger_pressureSensorHandle)
-    {
-        ROS_ERROR("PR2GripperSensorController could not find sensor named '%s'", rightFinger_pressureSensor_name.c_str());
-        return false;
-    }
-    ROS_INFO("RIGHT BEFORE CONSTRUCTOR");
-    myPressureObserver = new pressureObserver(leftFinger_pressureSensorHandle, rightFinger_pressureSensorHandle);
-    ROS_INFO("RIGHT AFTER CONSTRUCTOR %d",myPressureObserver);
-
-    #endif
-
-    ROS_INFO("I'M HERE AND PISSED ABOUT IT");
-    */
     
     // Construct a chain from the root to the tip and prepare the kinematics
     // Note the joints must be calibrated
@@ -575,7 +493,12 @@ void EECartImpedControlClassTool::starting() {
   hold_traj.initial_point = hold_traj.traj[0];
   hold_traj.starting_time = ros::Time::now();
   
-  chain_.getEfforts(tau_prev_);
+  // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
+  // chain_.getEfforts(tau_prev_);
+  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  		tau_prev_(i) = baxter_joint_state.velocity[i];
+  }
+  
   if (!hold_traj_ptr) {
     ROS_ERROR("During starting hold trajectory was null after filling");
     return;
@@ -699,12 +622,6 @@ void EECartImpedControlClassTool::update()
       Fdes_(0) = Fdes_(0) * gripTipScale;
       //F_(0) = KP_PR*Fdes_(0) + KI_PR*pressIntegral + INIT_VERT_F;
       F_(0) = KP_PR*pressErr + KI_PR*pressIntegral + INIT_VERT_F;
-      
-      /*if (!(updates_ % 10)) {
-        std::stringstream ss;
-        ss << boost::format("Requested vert force: %+.3f Desired diff: %+.3f") % F_(2) % Fdes_(0);
-        talk(ss.str());
-      }*/
 
       if(F_(0) > MAX_VERT_F){
         F_(0) = MAX_VERT_F;
@@ -752,16 +669,7 @@ void EECartImpedControlClassTool::update()
         // decrease the fingertip differential
         gripTipScale = Fdes_(0)/std::abs(Fdes_(0));
 
-        //talk("GOT SENTINEL");
       }
-
-      /*
-      if (!(updates_ % 10)) {
-        std::stringstream ss;
-        double integScaled = pressIntegral * KI_PR;
-        ss << boost::format("%.3f %.3f %.3f %.3f") % F_(0) % pressIntegral % integScaled % fDiff;
-        talk(ss.str());
-      }*/
       #endif
       #else
       F_(0) = Fdes_(0);
@@ -785,12 +693,6 @@ void EECartImpedControlClassTool::update()
         F_(1) = 0;
       else
         F_(1) = -Kp_(1) * xerr_(1) - Kd_(1)*xerr_diff_(1);
-      /*if(!(updates_ % 10))
-      {
-        std::stringstream ss;
-        ss << boost::format("KD_P_Y: %.2f F from KP: %+2.2f from KD: %+2.2f total: %+2.2f") % Kd_(1) %  (-Kp_(1) * xerr_(1)) % (-Kd_(1)*xerr_diff_(1)) % F_(1);
-        talk(ss.str());
-      }*/
     }
 
     if (desiredPose.isForceZ) {
@@ -845,46 +747,9 @@ void EECartImpedControlClassTool::update()
             tau_(i) += J_(j,i) * F_(j);
         }
     }
-    
-    //DEBUG! If you're actually using this for control, remember to set
-    // the thresh back to 0.99
-    /*if(minRatio < 1.99 && updates_ > 0)
-    {
-        std::stringstream ss1;
-        //ss1 << boost::format("Ratio: %1.6f") % minRatio;
-        for (unsigned int i = 0 ; i < kdl_chain_.getNrOfJoints() ; i++) 
-        {
-            double tmpTau = minRatio*(tau_(i) - tau_prev_(i));
-            ss1 << boost::format("%2.4f %2.4f %2.4f ") % tau_prev_(i) % tau_(i) % tmpTau;
-        }
-        talk(ss1.str());
-    }*/
-
-    /*std::stringstream ss1;
-    
-    for (unsigned int i = 0; i < 3; i++)
-    {
-        ss1 << boost::format("%2.6f %2.6f ") % x_.p(i) % xd_.p(i);
-    }
-    talk(ss1.str());*/
-
-    /*for (unsigned int i = 0 ; i < kdl_chain_.getNrOfJoints() ; i++) 
-    {
-        tau_prev_(i) = tau_(i);
-    }*/
-
-    /*if(minRatio < 0.00001)
-    {
-        talk("WHOOPSIE");
-    }*/
 
     // And finally send these torques out
     chain_.setEfforts(tau_);
-    
-    //Update pressure observer state
-    #ifndef PRESS_DBG
-    myPressureObserver->spin();
-    #endif
 
     // Publish wrench if we need to
     #ifdef SEND_WRENCH
@@ -979,24 +844,10 @@ void EECartImpedControlClassTool::update()
 
       #endif
 
-
-      //ss << boost::format("Pressure val: L: %+2.4f R: %+2.4f D: %+2.4f Z: %+2.4f") % myPressureObserver->padForce_left_cur_nonbiased % myPressureObserver->padForce_right_cur_nonbiased % fDiff % pressDiffZero;
-      //talk(ss.str());
-
-      //ss << boost::format("Force: %+.3f %+.3f %+.3f %+.3f %+.3f %+.3f \n Frame Z: %+.3f %+.3f %+.3f") % F_(0) % F_(1) % F_(2) % F_(3) % F_(4) % F_(5) % tool_frame_(0,2) % tool_frame_(1,2) % tool_frame_(2,2);
-      //talk(ss.str());
-
       KDL::Rotation offRot = xd_.M*(x_.M.Inverse());
       KDL::Vector offAx;
       double offAng = offRot.GetRotAngle(offAx);
       offAx = offAx*offAng;
-      /*
-      for(int i = 0; i < 3; i++)
-      {
-        ss << boost::format("%1.6f %1.6f ") % xerr_(i+3) % xerr_diff_(i+3);
-      }
-
-      talk(ss.str());*/
 
       if (controller_state_publisher_ && 
 	  controller_state_publisher_->trylock()) {
@@ -1033,9 +884,7 @@ void EECartImpedControlClassTool::update()
 	    tau_(i);
 	  controller_state_publisher_->msg_.actual_joint_efforts[i] = 
 	    tau_act_(i);
-      //ss << boost::format("%2.6f %2.6f %2.6f ") % q_(i) % tau_(i) % tau_act_(i);
 	}
-    //talk(ss.str());
 	controller_state_publisher_->msg_.effort_sq_error = eff_err;
 	boost::shared_ptr<const EECartImpedData> desired_poses_ptr;
 	desired_poses_box_.get(desired_poses_ptr);
