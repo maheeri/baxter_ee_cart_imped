@@ -314,7 +314,7 @@ void EECartImpedControlClassTool::commandCB
   
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
-  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
   		tau_prev_(i) = baxter_joint_state.velocity[i];
   }
 }
@@ -495,7 +495,7 @@ void EECartImpedControlClassTool::starting() {
   
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
-  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
   		tau_prev_(i) = baxter_joint_state.velocity[i];
   }
   
@@ -532,7 +532,7 @@ void EECartImpedControlClassTool::update()
   	}
     
     for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
-  		qdot_(i) = baxter_joint_state.velocity[i];
+  		qdot_.qdot(i) = baxter_joint_state.velocity[i];
   	}
     
     for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
