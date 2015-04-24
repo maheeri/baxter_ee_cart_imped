@@ -67,6 +67,7 @@ EECartImpedControlClassTool::sampleInterpolation() {
   last_goal_starting_time_ = current_goal_start_time.toSec();
 
   // time from the start of the series of points
+  // NEED TO CHANGE THE WAY TIME IS BEING RETRIEVED FROM ROBOT STATE
   double time = robot_state_->getTime().toSec();
   double timeFromStart = time - current_goal_start_time.toSec();  
   ee_cart_imped_msgs::StiffPoint next_point;
@@ -314,7 +315,7 @@ void EECartImpedControlClassTool::commandCB
   
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
-  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
   		tau_prev_(i) = baxter_joint_state.velocity[i];
   }
 }
@@ -495,7 +496,7 @@ void EECartImpedControlClassTool::starting() {
   
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
-  for (int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
+  for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
   		tau_prev_(i) = baxter_joint_state.velocity[i];
   }
   
@@ -532,7 +533,7 @@ void EECartImpedControlClassTool::update()
   	}
     
     for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
-  		qdot_(i) = baxter_joint_state.velocity[i];
+  		qdot_.qdot(i) = baxter_joint_state.velocity[i];
   	}
     
     for (int i = 0; i < numJoints; i++) { // Direct assignment currently. Might need to change
@@ -781,7 +782,9 @@ void EECartImpedControlClassTool::update()
       desired_poses_box_.get(desired_poses_ptr);
 
       const ros::Time &current_goal_start_time = desired_poses_ptr->starting_time;
-      double time = robot_state_->getTime().toSec();
+      //GETTING TIEM USING ros::Time::now() instead of robot_state_
+      double time = ros::Time::now().toSec();
+      //double time = robot_state_->getTime().toSec();
 
       ss << boost::format("%.6f ") % (time - current_goal_start_time.toSec());
 
@@ -892,6 +895,7 @@ void EECartImpedControlClassTool::update()
 	controller_state_publisher_->msg_.initial_point = last_point_;
 	controller_state_publisher_->msg_.running_time =
 	  robot_state_->getTime() - desired_poses_ptr->starting_time;
+	  //NEED TO CHANGE THE TIME BEING RETRIEVED FROM THE ROBOT STATE
 	controller_state_publisher_->unlockAndPublish();
       }
     }
@@ -948,7 +952,8 @@ int main(int argc, char** argv) {
   ros::Subscriber jointStateSub = n.subscribe("/robot/joint_states", 1000, jointStateCallback);
   
   while (n.ok()) {
-    ros::spinOnce(); 
+    ros::spinOnce();
+    update(); // Calling update within loop 
   }
   
   return 0;
