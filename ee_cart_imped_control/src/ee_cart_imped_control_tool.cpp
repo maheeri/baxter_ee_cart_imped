@@ -752,6 +752,8 @@ void EECartImpedControlClassTool::update()
     // And finally send these torques out
     // chain_.setEfforts(tau_);
     // WILL NEED TO USE THE BAXTER PUBLISHER INSTEAD OF THE CHAIN_ FROM PR2
+    // Create a ROS message using the torques and publish on the appropriate topic
+    
 
     // Publish wrench if we need to
     #ifdef SEND_WRENCH
