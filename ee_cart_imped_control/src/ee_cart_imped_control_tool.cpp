@@ -68,7 +68,8 @@ EECartImpedControlClassTool::sampleInterpolation() {
 
   // time from the start of the series of points
   // NEED TO CHANGE THE WAY TIME IS BEING RETRIEVED FROM ROBOT STATE
-  double time = robot_state_->getTime().toSec();
+  // double time = robot_state_->getTime().toSec();
+  double time = ros::Time::now();
   double timeFromStart = time - current_goal_start_time.toSec();  
   ee_cart_imped_msgs::StiffPoint next_point;
     
@@ -316,7 +317,7 @@ void EECartImpedControlClassTool::commandCB
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
   for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
-  		tau_prev_(i) = baxter_joint_state.velocity[i];
+  		tau_prev_(i) = baxter_joint_state.effort[i];
   }
 }
 
@@ -497,7 +498,7 @@ void EECartImpedControlClassTool::starting() {
   // THE PREVIOUS TAU NOW NEEDS TO BE ASSIGNED USING THE ROS JOINT_STATE 
   // chain_.getEfforts(tau_prev_);
   for (unsigned int i = 0; i < baxter_chain.getNrOfJoints(); i++) { // Direct assignment currently. Might need to change
-  		tau_prev_(i) = baxter_joint_state.velocity[i];
+  		tau_prev_(i) = baxter_joint_state.effort[i];
   }
   
   if (!hold_traj_ptr) {
