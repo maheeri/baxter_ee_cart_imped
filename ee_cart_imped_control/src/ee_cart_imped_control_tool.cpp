@@ -18,8 +18,14 @@ using namespace ee_cart_imped_control_ns;
 // Global variables for baxter porting 
 urdf::Model baxter_model;
 KDL::Tree baxter_tree;
-KDL::Chain baxter_chain;
-sensor_msgs::JointState baxter_joint_state;  
+KDL::Chain baxter_chain; // This will be a read only chain 
+sensor_msgs::JointState baxter_joint_state;
+
+//Define the node handle for publishing and subscribing 
+ros::NodeHandle pub_sub_node; 
+
+//Publisher for publishing joint torque messages to baxter
+ros::Publisher torque_publisher; 
 
 void EECartImpedControlClassTool::talk(std::string str)
 {
@@ -343,7 +349,7 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
     }
     n.param("use_fixed_frame",use_fixed_frame_,false);
     
-    // Construct a chain from the root to the tip and prepare the kinematics
+    /*// Construct a chain from the root to the tip and prepare the kinematics
     // Note the joints must be calibrated
     if (!chain_.init(robot, root_name, tip_name))
     {
@@ -359,13 +365,28 @@ bool EECartImpedControlClassTool::init(pr2_mechanism_model::RobotState *robot,
 	  ("EECartImpedControlClassTool could not use the chain from '%s' to '%s'",
 	   root_name.c_str(), tip_name.c_str());
         return false;
+    }*/
+
+    if (!baxter_tree.getChain(root_name, tip_name, baxter_chain)) {
+      ROS_ERROR("Failed to construct kdl chain");
+      return -1;
     }
-    
+
+    ROS_INFO("Successfully created read only kdl chain for baxter");
+
+
+    if (!baxter_tree.getChain(root_name, tip_name, kdl_chain_)) {
+      ROS_ERROR("Failed to construct kdl chain");
+      return -1;
+    }
+
+    ROS_INFO("Successfully created real time kdl chain for baxter");
+
     // Store the robot handle for later use (to get time)
     robot_state_ = robot;
 
     // Construct the kdl solvers in non-realtime
-    chain_.toKDL(kdl_chain_);
+    //chain_.toKDL(kdl_chain_); // This was replaced directly by constructing kdl_chain_ above
     jnt_to_pose_solver_.reset(new KDL::ChainFkSolverPos_recursive(kdl_chain_));
     jnt_to_jac_solver_.reset(new KDL::ChainJntToJacSolver(kdl_chain_));
 
@@ -748,14 +769,34 @@ void EECartImpedControlClassTool::update()
         for (unsigned int j = 0 ; j < 6 ; j++) {
             tau_(i) += J_(j,i) * F_(j);
         }
-    }
-
+    
+}
     // And finally send these torques out
     // chain_.setEfforts(tau_);
     // WILL NEED TO USE THE BAXTER PUBLISHER INSTEAD OF THE CHAIN_ FROM PR2
     // Create a ROS message using the torques and publish on the appropriate topic
-    
+    baxter_core_msgs::JointCommand torque_msg;
 
+    torque_msg.mode = 3; //Corresponds to Torque Mode
+
+    /*Manaully assigning joint names for the left arm (assuming order given in API:
+    https://github.com/RethinkRobotics/sdk-docs/wiki/API-Reference#Arm%20Joints)*/
+    torque_msg.name[0] = "left_e0"
+    torque_msg.name[1] = "left_e1"
+    torque_msg.name[2] = "left_s0"
+    torque_msg.name[3] = "left_s1"
+    torque_msg.name[4] = "left_w0"
+    torque_msg.name[5] = "left_w1"
+    torque_msg.name[6] = "left_w2"
+
+    //Manually assign torques to the messaged we will sent out
+    for (unsigned int i = 0 ; i < 7 ; i++) {
+            torque_msg.command[i] = tau_(i);
+    }
+
+    //Publish the torque message after composing it
+    pub_sub_node.publish(torque_msg);
+ 
     // Publish wrench if we need to
     #ifdef SEND_WRENCH
     if(!(updates_ % WRENCH_PD))
@@ -934,28 +975,16 @@ int main(int argc, char** argv) {
   }
   
   ROS_INFO("Successfully created kdl tree for baxter");
+
   
+  // Set up a ROS Node to collect joint state messages and publish them also
+  ros::init(argc, argv, "baxter_torque_control");
   
-  //Define these as rosparams later
-  std::string chain_root = "";
-  std::string chain_tip = "";
+  ros::Subscriber jointStateSub = pub_sub_node.subscribe("/robot/joint_states", 1000, jointStateCallback);
   
-  if (!baxter_tree.getChain(chain_root, chain_tip, baxter_chain)) {
-  	ROS_ERROR("Failed to construct kdl chain");
-  	return -1;
-  }
-  
-  ROS_INFO("Successfully created kdl chain for baxter");
-  
-  
-  // Set up a ROS Node to collect joint state messages
-  ros::init(argc, argv, "joint_state_listener");
-  
-  ros::NodeHandle n;
-  
-  ros::Subscriber jointStateSub = n.subscribe("/robot/joint_states", 1000, jointStateCallback);
-  
-  while (n.ok()) {
+  torque_publisher = pub_sub_node.advertise<baxter_core_msgs::JointCommand>("torque_publisher", 1000) 
+
+  while (pub_sub_node.ok()) {
     ros::spinOnce();
     update(); // Calling update within loop 
   }

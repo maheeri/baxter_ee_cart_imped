@@ -18,6 +18,8 @@
 #include <urdf/model.h>
 #include <kdl_parser/kdl_parser.hpp>
 #include <sensor_msgs/JointState.h>
+#include <baxter_core_msgs/JointCommand.h>
+
 
 #include <realtime_tools/realtime_publisher.h>
 #include <realtime_tools/realtime_box.h>

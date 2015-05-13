@@ -1,7 +1,7 @@
 r_arm_cart_imped_controller:
   type: ee_cart_imped_control/EECartImpedControlPluginTool
-  root_name: torso_lift_link
-  tip_name: r_gripper_tool_frame
+  root_name: torso
+  tip_name: right_gripper
   accelerometer_name: r_gripper_motor
   left_pressure_sensor_name: r_gripper_motorl_finger_tip
   right_pressure_sensor_name: r_gripper_motorr_finger_tip
@@ -25,8 +25,8 @@ r_arm_cart_imped_controller:
 
 l_arm_cart_imped_controller:
   type: ee_cart_imped_control/EECartImpedControlPluginTool
-  root_name: torso_lift_link
-  tip_name: l_gripper_tool_frame
+  root_name: torso
+  tip_name: left_gripper
   accelerometer_name: l_gripper_motor
   left_pressure_sensor_name: l_gripper_motorl_finger_tip
   right_pressure_sensor_name: l_gripper_motorr_finger_tip
