@@ -545,7 +545,7 @@ void EECartImpedControlClassTool::starting() {
 void EECartImpedControlClassTool::update()
 {
 	// NEED TO UPDATE TIME ACCORDING TO THE LAST LOOP ITERATION FOR UPDATE
-    last_time_ = robot_state_->getTime();
+    last_time_ = ros::Time::now();
     int numJoints = baxter_chain.getNrOfJoints();
 
     // Get the current joint positions and velocities
